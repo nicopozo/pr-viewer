@@ -1,5 +1,5 @@
 package model
 
 type User struct {
-	Username string `json:"login"`
+	Username string `json:"username"`
 }

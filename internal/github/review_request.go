@@ -1,10 +1,10 @@
 package github
 
-type ReviewRequest struct {
-	RequestedReviewer User `json:"requestedReviewer"`
+type reviewRequest struct {
+	RequestedReviewer user `json:"requestedReviewer"`
 }
 
-// ReviewRequestList represents a ReviewRequestConnection
-type ReviewRequestList struct {
-	ReviewRequests []ReviewRequest `json:"nodes"`
+// reviewRequestList represents a ReviewRequestConnection
+type reviewRequestList struct {
+	ReviewRequests []reviewRequest `json:"nodes"`
 }

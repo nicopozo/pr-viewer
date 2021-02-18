@@ -1,11 +1,12 @@
 package github
 
-type Repository struct {
-	PullRequests PullRequestList `json:"pullRequests"`
+type repository struct {
+	Name         string          `json:"name"`
+	PullRequests pullRequestList `json:"pullRequests"`
 }
 
-type RepositoryResponse struct {
+type repositoryResponse struct {
 	Data struct {
-		Repository Repository `json:"repository"`
+		Repository repository `json:"repository"`
 	} `json:"data"`
 }

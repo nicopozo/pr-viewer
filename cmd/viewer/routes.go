@@ -15,6 +15,7 @@ func mapRoutes(router *gin.Engine) {
 
 	ctrl := newPRController()
 	router.GET("/pr-viewer/pull-requests", ctrl.GetPRs)
+	router.GET("/pr-viewer/username", ctrl.GetUsername)
 
 	router.GET("/ping", ping)
 }
@@ -26,7 +27,7 @@ func ping(c *gin.Context) {
 func newPRController() controller.PRController {
 	httpClient := clients.NewHTTPClient(clients.NewHTTPSettings())
 
-	githubClient, err := github.NewGithubClient(&httpClient)
+	githubClient, err := github.NewClient(&httpClient)
 	if err != nil {
 		panic(err)
 	}

@@ -1,17 +1,20 @@
 package github
 
+import "time"
+
 const (
 	pullRequestReviewStateCommented        = "COMMENTED"
 	pullRequestReviewStateChangesRequested = "CHANGES_REQUESTED"
 	pullRequestReviewStateApproved         = "APPROVED"
 )
 
-type PullRequestReview struct {
-	Author User   `json:"author"`
-	State  string `json:"state"`
+type pullRequestReview struct {
+	Author    user      `json:"author"`
+	State     string    `json:"state"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 // PullRequestReviewList represents a PullRequestReviewConnection
-type PullRequestReviewList struct {
-	PullRequestReview []PullRequestReview `json:"nodes"`
+type pullRequestReviewList struct {
+	PullRequestReview []pullRequestReview `json:"nodes"`
 }

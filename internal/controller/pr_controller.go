@@ -11,6 +11,7 @@ import (
 )
 
 type PRController interface {
+	GetUsername(ginCtx *gin.Context)
 	GetPRs(ginCtx *gin.Context)
 }
 
@@ -26,20 +27,72 @@ func NewPRController(service service.PRService) (PRController, error) {
 	return &prController{service: service}, nil
 }
 
-func (controller *prController) GetPRs(ginCtx *gin.Context) {
+func (controller *prController) GetUsername(ginCtx *gin.Context) {
 	reqContext := viewercontext.New(ginCtx)
 	logger := viewercontext.Logger(reqContext)
 
-	userType := ginCtx.Request.URL.Query().Get("user_type")
-	if userType != "owner" && userType != "reviewer" {
+	token := ginCtx.Request.URL.Query().Get("token")
+	if token == "" {
 		logger.Error(controller, nil,
-			fmt.Errorf("user_type parameter required, only 'owner' or 'reviewer' are valid values"),
-			"error getting pull request")
+			fmt.Errorf("token parameter required"), "error getting pull request")
 		errorResult := model.NewError(model.ValidationError,
-			"user_type parameter required, only 'owner' or 'reviewer' are valid values")
+			"token parameter required")
 
 		ginCtx.JSON(http.StatusBadRequest, errorResult)
 
 		return
 	}
+
+	result, err := controller.service.GetUser(reqContext, token)
+	if err != nil {
+		logger.Error(controller, nil, err, "Failed to get user")
+
+		errorResult := model.NewError(model.InternalError, "Error occurred getting user. %s", err.Error())
+		ginCtx.JSON(http.StatusInternalServerError, errorResult)
+
+		return
+	}
+
+	ginCtx.JSON(http.StatusOK, result)
+}
+
+func (controller *prController) GetPRs(ginCtx *gin.Context) {
+	reqContext := viewercontext.New(ginCtx)
+	logger := viewercontext.Logger(reqContext)
+
+	userType := ginCtx.Request.URL.Query().Get("user_type")
+	if userType != "" && userType != "owner" && userType != "reviewer" {
+		logger.Error(controller, nil,
+			fmt.Errorf("only blank, 'owner' or 'reviewer' are valid values"),
+			"error getting pull request")
+		errorResult := model.NewError(model.ValidationError, "only blank, 'owner' or 'reviewer' are valid values")
+
+		ginCtx.JSON(http.StatusBadRequest, errorResult)
+
+		return
+	}
+
+	token := ginCtx.Request.URL.Query().Get("token")
+	if token == "" {
+		logger.Error(controller, nil,
+			fmt.Errorf("token parameter required"), "error getting pull request")
+		errorResult := model.NewError(model.ValidationError,
+			"token parameter required")
+
+		ginCtx.JSON(http.StatusBadRequest, errorResult)
+
+		return
+	}
+
+	result, err := controller.service.GetPRs(reqContext, userType, token)
+	if err != nil {
+		logger.Error(controller, nil, err, "Failed to search rules")
+
+		errorResult := model.NewError(model.InternalError, "Error occurred when searching rules. %s", err.Error())
+		ginCtx.JSON(http.StatusInternalServerError, errorResult)
+
+		return
+	}
+
+	ginCtx.JSON(http.StatusOK, result)
 }

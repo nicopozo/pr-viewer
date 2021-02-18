@@ -9,6 +9,8 @@ type PullRequest struct {
 	Assignees      int                 `json:"assignees"`
 	Url            string              `json:"url"`
 	CreatedAt      time.Time           `json:"created_at"`
+	Application    string              `json:"application"`
+	State          string              `json:"state"`
 }
 
 //PullRequestList

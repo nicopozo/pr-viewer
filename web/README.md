@@ -1,4 +1,4 @@
-# web
+# mocks-frontend
 
 ## Project setup
 ```
