@@ -3,8 +3,10 @@ package github
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	viewercontext "github.com/nicopozo/pr-viewer/internal/context"
@@ -56,9 +58,16 @@ func (cli *client) GetUsername(ctx context.Context, token string) (string, error
 
 	defer closeResponseBody(cli, resp, logger)
 
+	responseBody := ""
+	if b, err := ioutil.ReadAll(resp.Body); err == nil {
+		responseBody = string(b)
+	}
+
+	logger.Debug(cli, nil, "github username response: %s", responseBody)
+
 	response := new(viewerResponse)
 
-	err = jsonutils.Unmarshal(resp.Body, response)
+	err = jsonutils.Unmarshal(strings.NewReader(responseBody), response)
 	if err != nil {
 		return "", fmt.Errorf("error unmarshalling body, %w", err)
 	}
@@ -101,6 +110,7 @@ func (cli *client) GetRepositoryPullRequests(ctx context.Context, owner, reposit
         }
         url
 		createdAt
+		title
         repository {
           name
         }
@@ -154,7 +164,10 @@ func transformPullRequest(pr pullRequest) model.PullRequest {
 		Url:         pr.Url,
 		CreatedAt:   pr.CreatedAt,
 		Application: pr.Repository.Name,
+		Title:       pr.Title,
 	}
+
+	result.Story = getStory(pr.Title)
 
 	for _, rr := range pr.ReviewRequests.ReviewRequests {
 		reviewRequest := model.ReviewRequest{
@@ -175,6 +188,36 @@ func transformPullRequest(pr pullRequest) model.PullRequest {
 	}
 
 	return result
+}
+
+func getStory(title string) string {
+	story := getStoryFromTitle(title, "MPCON-")
+	if story != "" {
+
+		return story
+	}
+
+	return getStoryFromTitle(title, "LIQ-")
+}
+
+func getStoryFromTitle(title, storyPrefix string) string {
+	title = strings.ToUpper(title)
+	if strings.HasPrefix(title, storyPrefix) {
+		idx := 0
+		for pos, char := range title {
+			charStr := fmt.Sprintf("%c", char)
+			if pos >= len(storyPrefix) {
+				if _, err := strconv.Atoi(charStr); err != nil {
+					idx = pos
+					break
+				}
+			}
+		}
+
+		return title[:idx]
+	}
+
+	return ""
 }
 
 func closeResponseBody(cli interface{}, response *http.Response, logger log.ILogger) {

@@ -10,6 +10,7 @@ type pullRequest struct {
 	Url            string                `json:"url"`
 	CreatedAt      time.Time             `json:"createdAt"`
 	Repository     repository            `json:"repository"`
+	Title          string                `json:"title"`
 }
 
 //pullRequestList represents a Github PullRequestConnection object

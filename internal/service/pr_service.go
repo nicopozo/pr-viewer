@@ -3,13 +3,13 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
-
-	"golang.org/x/sync/errgroup"
 
 	viewercontext "github.com/nicopozo/pr-viewer/internal/context"
 	"github.com/nicopozo/pr-viewer/internal/github"
 	"github.com/nicopozo/pr-viewer/internal/model"
+	"golang.org/x/sync/errgroup"
 )
 
 type PRService interface {
@@ -20,6 +20,7 @@ type PRService interface {
 type githubPRService struct {
 	githubClient github.Client
 	mx           sync.Mutex
+	incrMx       sync.Mutex
 }
 
 func NewGithubPRService(githubClient github.Client) (PRService, error) {
@@ -58,6 +59,7 @@ func (svc *githubPRService) GetPRs(ctx context.Context, userType, token string) 
 	}
 
 	result := new(model.PullRequestList)
+	reviewersCount := make(map[string]int)
 	routinesLimit := make(chan string, 10)
 	defer close(routinesLimit)
 
@@ -76,11 +78,20 @@ func (svc *githubPRService) GetPRs(ctx context.Context, userType, token string) 
 			}
 
 			for _, pr := range resp.PullRequests {
+				resultPR := completeReviewer(pr)
+
 				if prApplies(pr, userType, username) {
-					resultPR := completeReviewer(pr)
 					svc.mx.Lock()
 					result.PullRequests = append(result.PullRequests, resultPR)
 					svc.mx.Unlock()
+				}
+
+				for _, rr := range resultPR.ReviewRequests {
+					if rr.RequestedReviewer != "rp-workflow" {
+						svc.incrMx.Lock()
+						reviewersCount[rr.RequestedReviewer]++
+						svc.incrMx.Unlock()
+					}
 				}
 			}
 
@@ -93,6 +104,18 @@ func (svc *githubPRService) GetPRs(ctx context.Context, userType, token string) 
 	if err := group.Wait(); err != nil {
 		logger.Error(svc, nil, err, "githubPRService.GetPRs() complete with error")
 	}
+
+	for rev, c := range reviewersCount {
+		count := model.ReviewerCount{
+			Username: rev,
+			Count:    c,
+		}
+		result.ReviewersCount = append(result.ReviewersCount, count)
+	}
+
+	sort.Slice(result.ReviewersCount, func(i, j int) bool {
+		return result.ReviewersCount[i].Count > result.ReviewersCount[j].Count
+	})
 
 	result.Total = len(result.PullRequests)
 
@@ -112,11 +135,15 @@ func completeReviewer(pr model.PullRequest) model.PullRequest {
 			} else {
 				switch newReview.State {
 				case model.ReviewRequestStatusApproved, model.ReviewRequestStatusChangesRequested:
-					if current.State == model.ReviewRequestStatusChangesRequested &&
+					if current.State != model.ReviewRequestStatusCommented &&
 						current.UpdatedAt.Before(newReview.UpdatedAt) {
 						states[newReview.Author] = newReview
 					}
 					if current.State == model.ReviewRequestStatusApproved &&
+						current.UpdatedAt.Before(newReview.UpdatedAt) {
+						states[newReview.Author] = newReview
+					}
+					if current.State == model.ReviewRequestStatusDismissed &&
 						current.UpdatedAt.Before(newReview.UpdatedAt) {
 						states[newReview.Author] = newReview
 					}
